@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "320728653956",
+    "project_id": "roti-bakar-amang-app",
+    "storage_bucket": "roti-bakar-amang-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:320728653956:android:817ccaec9522b3a3cf22d1",
+        "android_client_info": {
+          "package_name": "com.example.keuangan_roti"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAu7eIvjiJs5ZfQURaf7j3zNOUHen9RpSA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
