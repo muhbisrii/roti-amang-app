@@ -714,6 +714,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 });
                 
                 int monthlyNet = 0;
+                int monthlyGross = 0; // TAMBAHAN: Variabel Uang Kotor Sebulan
                 int dailyGross = 0;
                 int dailyNet = 0;
                 int dailyExpense = 0;
@@ -728,6 +729,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     monthlyNet -= (data['amount'] as num).toInt();
                   } else {
                     monthlyNet += (data['net'] as num).toInt();
+                    monthlyGross += (data['gross'] as num).toInt(); // TAMBAHAN: Menghitung uang kotor periode ini
                     
                     int savedRent = data.containsKey('rent') ? (data['rent'] as num).toInt() : defaultRentFee;
                     int savedSalary = data.containsKey('salary') ? (data['salary'] as num).toInt() : defaultSalaryFee;
@@ -765,13 +767,35 @@ class _HomeScreenState extends State<HomeScreen> {
                               letterSpacing: -1
                             )
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 8),
+                          // --- TAMBAHAN: Chip Uang Kotor Bulanan ---
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFF9F0A).withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.payments_outlined, color: Color(0xFFFF9F0A), size: 14),
+                                const SizedBox(width: 6),
+                                Text(
+                                  "Kotor: ${formatCurrency.format(monthlyGross)}",
+                                  style: const TextStyle(color: Color(0xFFFF9F0A), fontSize: 12, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // --- SELESAI TAMBAHAN ---
+                          const SizedBox(height: 12),
                           Text(periodText, style: const TextStyle(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),
                     const SizedBox(height: 16),
 
+                    // --- KARTU TARGET BULANAN ---
                     _buildGlassCard(
                       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
                       child: Column(
