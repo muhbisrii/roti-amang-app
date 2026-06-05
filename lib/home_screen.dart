@@ -872,7 +872,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         children: [
                           Column(
                             children: [
-                              const Text("Jualan Kotor", style: TextStyle(color: Colors.white70, fontSize: 11)),
+                              const Text("Duit Kotor", style: TextStyle(color: Colors.white70, fontSize: 11)),
                               const SizedBox(height: 8),
                               Text(formatCurrency.format(dailyGross), style: const TextStyle(color: Color(0xFFFF9F0A), fontWeight: FontWeight.w800, fontSize: 15)),
                             ],
