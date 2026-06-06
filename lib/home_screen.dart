@@ -13,17 +13,14 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   
-  // Nilai default, tapi sekarang akan disimpan dinamis ke database
   final int defaultRentFee = 17000;
   final int defaultSalaryFee = 40000;
   final formatCurrency = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp', decimalDigits: 0);
 
-  // Variabel untuk menyimpan tanggal yang sedang dilihat
   DateTime selectedDate = DateTime.now();
   Stream<QuerySnapshot>? _transactionsStream;
   String _lastCycleKey = "";
 
-  // LOGIKA BARU: Siklus Bulanan Dimulai Setiap Tanggal 4
   String get currentCycleKey {
     if (selectedDate.day >= 4) {
       return "${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}";
@@ -33,7 +30,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // Menampilkan Teks Periode (Contoh: 4 Jun - 3 Jul 2026)
   String get periodText {
     DateTime start;
     DateTime end;
@@ -69,7 +65,7 @@ class _HomeScreenState extends State<HomeScreen> {
     
     DateTime today = DateTime(now.year, now.month, now.day);
     DateTime dateToCheck = DateTime(newDate.year, newDate.month, newDate.day);
-    DateTime startDate = DateTime(2026, 6, 4); // Batas Hari Pertama Jualan
+    DateTime startDate = DateTime(2026, 6, 4); 
     
     if (dateToCheck.isAfter(today)) return;
     
@@ -105,12 +101,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // --- FITUR BARU: TAMPILAN DETAIL TRANSAKSI ---
   void _showDetailSheet(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     bool isIncome = data['type'] == 'income';
     
-    // Format Waktu Transaksi
     String timeString = "";
     if (data['timestamp'] != null) {
       DateTime ts = (data['timestamp'] as Timestamp).toDate();
@@ -141,7 +135,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 24),
             
-            // Keterangan Penuh
             const Text("Keterangan", style: TextStyle(color: Colors.grey, fontSize: 13)),
             const SizedBox(height: 4),
             Text(
@@ -150,7 +143,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 16),
             
-            // Waktu
             const Text("Waktu Input", style: TextStyle(color: Colors.grey, fontSize: 13)),
             const SizedBox(height: 4),
             Text(timeString.isNotEmpty ? timeString : "Waktu tidak diketahui", style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500)),
@@ -158,10 +150,16 @@ class _HomeScreenState extends State<HomeScreen> {
             const Divider(color: Colors.white24),
             const SizedBox(height: 16),
 
-            // Rincian Angka
             if (isIncome) ...[
-              _buildDetailRow("Uang Kotor (Masuk)", formatCurrency.format(data['gross']), Colors.white),
-              const SizedBox(height: 8),
+              // --- UPDATE DETIL QRIS & CASH ---
+              _buildDetailRow("Uang Kotor (Total)", formatCurrency.format(data['gross']), Colors.white, isBold: true),
+              const SizedBox(height: 4),
+              if (data.containsKey('cash') || !data.containsKey('qris')) 
+                _buildDetailRow("  • Tunai (Cash Laci)", formatCurrency.format(data.containsKey('cash') ? data['cash'] : data['gross']), Colors.white70),
+              if (data.containsKey('qris') && data['qris'] > 0)
+                _buildDetailRow("  • Transfer (QRIS)", formatCurrency.format(data['qris']), Colors.white70),
+              const SizedBox(height: 16),
+
               _buildDetailRow("Potongan Sewa", "- ${formatCurrency.format(data.containsKey('rent') ? data['rent'] : defaultRentFee)}", Colors.orange),
               const SizedBox(height: 8),
               _buildDetailRow("Potongan Gaji", "- ${formatCurrency.format(data.containsKey('salary') ? data['salary'] : defaultSalaryFee)}", Colors.orange),
@@ -179,19 +177,20 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Widget Bantuan untuk Rincian Angka di Detail
   Widget _buildDetailRow(String label, String value, Color valueColor, {bool isBold = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: TextStyle(color: Colors.white70, fontSize: isBold ? 16 : 14, fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
+        Text(label, style: TextStyle(color: isBold ? Colors.white : Colors.white70, fontSize: isBold ? 16 : 14, fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
         Text(value, style: TextStyle(color: valueColor, fontSize: isBold ? 18 : 14, fontWeight: FontWeight.bold)),
       ],
     );
   }
 
+  // --- UPDATE: INPUT JUALAN (PISAH TUNAI DAN QRIS) ---
   void _showInputIncomeSheet() {
-    final TextEditingController incomeController = TextEditingController();
+    final TextEditingController cashController = TextEditingController();
+    final TextEditingController qrisController = TextEditingController();
     final TextEditingController rentController = TextEditingController(text: defaultRentFee.toString());
     final TextEditingController salaryController = TextEditingController(text: defaultSalaryFee.toString());
     String displayDate = DateFormat('EEEE, d MMMM yyyy', 'id_ID').format(selectedDate);
@@ -209,22 +208,43 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Text("Input Jualan untuk:\n$displayDate", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
             const SizedBox(height: 20),
+            
+            // Input Uang Cash Laci
             TextField(
-              controller: incomeController,
+              controller: cashController,
               keyboardType: TextInputType.number,
               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
               decoration: InputDecoration(
-                labelText: "Total Uang Masuk Kotor (Rp)",
-                hintText: "Contoh: 187000",
+                labelText: "Uang Tunai / Cash (Rp)",
+                hintText: "Contoh: 100000",
                 hintStyle: TextStyle(color: Colors.white.withOpacity(0.3), fontWeight: FontWeight.normal),
                 labelStyle: const TextStyle(color: Colors.grey),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                 filled: true,
                 fillColor: Colors.white.withOpacity(0.1),
-                prefixIcon: const Icon(Icons.payments_outlined, color: Colors.white70),
+                prefixIcon: const Icon(Icons.payments_outlined, color: Colors.greenAccent),
               ),
             ),
             const SizedBox(height: 12),
+            
+            // Input Uang QRIS
+            TextField(
+              controller: qrisController,
+              keyboardType: TextInputType.number,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              decoration: InputDecoration(
+                labelText: "Transfer / QRIS (Rp)",
+                hintText: "Contoh: 87000 (Kosongkan jika tidak ada)",
+                hintStyle: TextStyle(color: Colors.white.withOpacity(0.3), fontWeight: FontWeight.normal),
+                labelStyle: const TextStyle(color: Colors.grey),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.1),
+                prefixIcon: const Icon(Icons.qr_code_2, color: Colors.blueAccent),
+              ),
+            ),
+            const SizedBox(height: 16),
+
             Row(
               children: [
                 Expanded(
@@ -258,11 +278,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              "*Anda bisa mengedit potongan jika gaji/sewa hari ini berbeda.",
-              style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.4)),
-            ),
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
@@ -273,8 +288,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
                 onPressed: () async {
-                  if (incomeController.text.isNotEmpty) {
-                    int gross = int.parse(incomeController.text);
+                  int cash = cashController.text.isNotEmpty ? int.parse(cashController.text) : 0;
+                  int qris = qrisController.text.isNotEmpty ? int.parse(qrisController.text) : 0;
+                  int gross = cash + qris;
+
+                  if (gross > 0) {
                     int rent = rentController.text.isNotEmpty ? int.parse(rentController.text) : 0;
                     int salary = salaryController.text.isNotEmpty ? int.parse(salaryController.text) : 0;
                     
@@ -283,6 +301,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     await _firestore.collection('transactions').add({
                       'type': 'income',
                       'gross': gross,
+                      'cash': cash,
+                      'qris': qris,
                       'rent': rent,
                       'salary': salary,
                       'net': net,
@@ -344,9 +364,6 @@ class _HomeScreenState extends State<HomeScreen> {
               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
               decoration: InputDecoration(
                 labelText: "Total Pengeluaran (Rp)",
-                hintText: "Contoh: 50000",
-                hintStyle: TextStyle(color: Colors.white.withOpacity(0.3), fontWeight: FontWeight.normal),
-                labelStyle: const TextStyle(color: Colors.grey),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                 filled: true,
                 fillColor: Colors.white.withOpacity(0.1),
@@ -457,11 +474,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _showEditIncomeSheet(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
-    final TextEditingController incomeController = TextEditingController(text: data['gross'].toString());
     
+    // Mencegah error jika data lama belum punya record cash/qris
+    int savedCash = data.containsKey('cash') ? data['cash'] : data['gross'];
+    int savedQris = data.containsKey('qris') ? data['qris'] : 0;
     int savedRent = data.containsKey('rent') ? data['rent'] : defaultRentFee;
     int savedSalary = data.containsKey('salary') ? data['salary'] : defaultSalaryFee;
-    
+
+    final TextEditingController cashController = TextEditingController(text: savedCash > 0 ? savedCash.toString() : "");
+    final TextEditingController qrisController = TextEditingController(text: savedQris > 0 ? savedQris.toString() : "");
     final TextEditingController rentController = TextEditingController(text: savedRent.toString());
     final TextEditingController salaryController = TextEditingController(text: savedSalary.toString());
 
@@ -478,19 +499,34 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             const Text("Edit Data Jualan", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
             const SizedBox(height: 20),
+            
             TextField(
-              controller: incomeController,
+              controller: cashController,
               keyboardType: TextInputType.number,
               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
               decoration: InputDecoration(
-                labelText: "Total Uang Masuk Kotor (Rp)",
+                labelText: "Uang Tunai / Cash (Rp)",
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                 filled: true,
                 fillColor: Colors.white.withOpacity(0.1),
-                prefixIcon: const Icon(Icons.payments_outlined, color: Colors.white70),
+                prefixIcon: const Icon(Icons.payments_outlined, color: Colors.greenAccent),
               ),
             ),
             const SizedBox(height: 12),
+            TextField(
+              controller: qrisController,
+              keyboardType: TextInputType.number,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              decoration: InputDecoration(
+                labelText: "Transfer / QRIS (Rp)",
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.1),
+                prefixIcon: const Icon(Icons.qr_code_2, color: Colors.blueAccent),
+              ),
+            ),
+            const SizedBox(height: 16),
+
             Row(
               children: [
                 Expanded(
@@ -534,15 +570,19 @@ class _HomeScreenState extends State<HomeScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
                 onPressed: () async {
-                  if (incomeController.text.isNotEmpty) {
-                    int gross = int.parse(incomeController.text);
+                  int cash = cashController.text.isNotEmpty ? int.parse(cashController.text) : 0;
+                  int qris = qrisController.text.isNotEmpty ? int.parse(qrisController.text) : 0;
+                  int gross = cash + qris;
+
+                  if (gross > 0) {
                     int rent = rentController.text.isNotEmpty ? int.parse(rentController.text) : 0;
                     int salary = salaryController.text.isNotEmpty ? int.parse(salaryController.text) : 0;
-                    
                     int net = gross - (rent + salary);
                     
                     await doc.reference.update({
                       'gross': gross,
+                      'cash': cash,
+                      'qris': qris,
                       'rent': rent,
                       'salary': salary,
                       'net': net,
@@ -714,10 +754,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 });
                 
                 int monthlyNet = 0;
-                int monthlyGross = 0; // TAMBAHAN: Variabel Uang Kotor Sebulan
+                int monthlyGross = 0;
                 int dailyGross = 0;
                 int dailyNet = 0;
                 int dailyExpense = 0;
+                
+                // Variabel baru untuk menampung total laci vs rekening hari ini
+                int dailyCash = 0;
+                int dailyQris = 0; 
+                
                 int fixedCostCollected = 0;
                 List<DocumentSnapshot> dailyDocs = [];
 
@@ -729,7 +774,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     monthlyNet -= (data['amount'] as num).toInt();
                   } else {
                     monthlyNet += (data['net'] as num).toInt();
-                    monthlyGross += (data['gross'] as num).toInt(); // TAMBAHAN: Menghitung uang kotor periode ini
+                    monthlyGross += (data['gross'] as num).toInt(); 
                     
                     int savedRent = data.containsKey('rent') ? (data['rent'] as num).toInt() : defaultRentFee;
                     int savedSalary = data.containsKey('salary') ? (data['salary'] as num).toInt() : defaultSalaryFee;
@@ -745,6 +790,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     } else {
                       dailyGross += (data['gross'] as num).toInt();
                       dailyNet += (data['net'] as num).toInt();
+                      
+                      // Menjumlahkan Cash & QRIS harian
+                      int c = data.containsKey('cash') ? (data['cash'] as num).toInt() : (data['gross'] as num).toInt();
+                      int q = data.containsKey('qris') ? (data['qris'] as num).toInt() : 0;
+                      dailyCash += c;
+                      dailyQris += q;
                     }
                   }
                 }
@@ -768,7 +819,6 @@ class _HomeScreenState extends State<HomeScreen> {
                             )
                           ),
                           const SizedBox(height: 8),
-                          // --- TAMBAHAN: Chip Uang Kotor Bulanan ---
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
@@ -787,7 +837,6 @@ class _HomeScreenState extends State<HomeScreen> {
                               ],
                             ),
                           ),
-                          // --- SELESAI TAMBAHAN ---
                           const SizedBox(height: 12),
                           Text(periodText, style: const TextStyle(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.bold)),
                         ],
@@ -795,7 +844,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // --- KARTU TARGET BULANAN ---
                     _buildGlassCard(
                       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
                       child: Column(
@@ -867,31 +915,65 @@ class _HomeScreenState extends State<HomeScreen> {
 
                     _buildGlassCard(
                       padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      child: Column(
                         children: [
-                          Column(
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: [
-                              const Text("Duit Kotor", style: TextStyle(color: Colors.white70, fontSize: 11)),
-                              const SizedBox(height: 8),
-                              Text(formatCurrency.format(dailyGross), style: const TextStyle(color: Color(0xFFFF9F0A), fontWeight: FontWeight.w800, fontSize: 15)),
+                              Column(
+                                children: [
+                                  const Text("Jualan Kotor", style: TextStyle(color: Colors.white70, fontSize: 11)),
+                                  const SizedBox(height: 8),
+                                  Text(formatCurrency.format(dailyGross), style: const TextStyle(color: Color(0xFFFF9F0A), fontWeight: FontWeight.w800, fontSize: 15)),
+                                ],
+                              ),
+                              Container(width: 1, height: 40, color: Colors.white.withOpacity(0.2)),
+                              Column(
+                                children: [
+                                  const Text("Duit Sendiri", style: TextStyle(color: Colors.white70, fontSize: 11)),
+                                  const SizedBox(height: 8),
+                                  Text(formatCurrency.format(dailyNet), style: const TextStyle(color: Color(0xFF32D74B), fontWeight: FontWeight.w800, fontSize: 15)),
+                                ],
+                              ),
+                              Container(width: 1, height: 40, color: Colors.white.withOpacity(0.2)),
+                              Column(
+                                children: [
+                                  const Text("Pengeluaran", style: TextStyle(color: Colors.white70, fontSize: 11)),
+                                  const SizedBox(height: 8),
+                                  Text(formatCurrency.format(dailyExpense), style: const TextStyle(color: Color(0xFFFF453A), fontWeight: FontWeight.w800, fontSize: 15)),
+                                ],
+                              ),
                             ],
                           ),
-                          Container(width: 1, height: 40, color: Colors.white.withOpacity(0.2)),
-                          Column(
-                            children: [
-                              const Text("Duit Sendiri", style: TextStyle(color: Colors.white70, fontSize: 11)),
-                              const SizedBox(height: 8),
-                              Text(formatCurrency.format(dailyNet), style: const TextStyle(color: Color(0xFF32D74B), fontWeight: FontWeight.w800, fontSize: 15)),
-                            ],
-                          ),
-                          Container(width: 1, height: 40, color: Colors.white.withOpacity(0.2)),
-                          Column(
-                            children: [
-                              const Text("Pengeluaran", style: TextStyle(color: Colors.white70, fontSize: 11)),
-                              const SizedBox(height: 8),
-                              Text(formatCurrency.format(dailyExpense), style: const TextStyle(color: Color(0xFFFF453A), fontWeight: FontWeight.w800, fontSize: 15)),
-                            ],
+                          
+                          // --- UPDATE: KOTAK INFO TUNAI VS QRIS ---
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(Icons.money, color: Colors.greenAccent, size: 16),
+                                    const SizedBox(width: 6),
+                                    Text("Laci: ${formatCurrency.format(dailyCash)}", style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                                Container(width: 1, height: 16, color: Colors.white.withOpacity(0.2)),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.qr_code_2, color: Colors.blueAccent, size: 16),
+                                    const SizedBox(width: 6),
+                                    Text("QRIS: ${formatCurrency.format(dailyQris)}", style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -935,14 +1017,13 @@ class _HomeScreenState extends State<HomeScreen> {
                           int savedSalary = data.containsKey('salary') ? (data['salary'] as num).toInt() : defaultSalaryFee;
                           int totalPotongan = savedRent + savedSalary;
                           
-                          // InkWell digunakan agar kotak riwayat bisa disentuh/ditekan
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 12),
                             child: Material(
                               color: Colors.transparent,
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(16),
-                                onTap: () => _showDetailSheet(doc), // Membuka pop-up rincian detail
+                                onTap: () => _showDetailSheet(doc),
                                 child: Container(
                                   padding: const EdgeInsets.all(16),
                                   decoration: BoxDecoration(
@@ -971,7 +1052,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                             Text(
                                               isIncome ? "Hasil Jualan" : "${data['note']}", 
                                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
-                                              maxLines: 2, // Membatasi teks agar tidak merusak layout
+                                              maxLines: 2, 
                                               overflow: TextOverflow.ellipsis,
                                             ),
                                             const SizedBox(height: 4),
@@ -1036,3 +1117,13 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
+```eof
+
+### Cara Melakukan Update:
+
+1. **Simpan (Save)** file `lib/home_screen.dart` ini di VS Code Anda.
+2. Untuk memperbarui website di **Vercel**, ketik ini di terminal VS Code:
+   ```bash
+   git add .
+   git commit -m "Pemisahan input Tunai dan QRIS"
+   git push origin main
